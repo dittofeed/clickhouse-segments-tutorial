@@ -22,7 +22,7 @@ const setup = [
     CREATE TABLE segment_assignments_idempotent (
         user_id String,
         value Boolean,
-        computed_at DateTime DEFAULT now(),
+        assigned_at DateTime DEFAULT now(),
         INDEX value_idx value TYPE minmax GRANULARITY 4
     )
     Engine = ReplacingMergeTree()
@@ -95,7 +95,7 @@ describe("using an idempotent setup", () => {
       query: `
           SELECT
             user_id,
-            argMax(value, computed_at) AS latest_value
+            argMax(value, assigned_at) AS latest_value
           FROM segment_assignments_idempotent
           GROUP BY user_id
           HAVING latest_value = True;

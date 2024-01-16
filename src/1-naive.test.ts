@@ -21,7 +21,7 @@ const setup = [
     CREATE TABLE segment_assignments_naive (
         user_id String,
         value Boolean,
-        computed_at DateTime DEFAULT now(),
+        assigned_at DateTime DEFAULT now(),
         INDEX value_idx value TYPE minmax GRANULARITY 4
     )
     Engine = ReplacingMergeTree()
@@ -82,7 +82,7 @@ describe("using a naive setup", () => {
       query: `
           SELECT
             user_id,
-            argMax(value, computed_at) AS latest_value
+            argMax(value, assigned_at) AS latest_value
           FROM segment_assignments_naive
           GROUP BY user_id
           HAVING latest_value = True;
