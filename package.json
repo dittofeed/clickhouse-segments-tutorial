@@ -1,0 +1,24 @@
+{
+  "name": "clickhouse-segments-tutorial",
+  "version": "0.0.1",
+  "description": "Repository demonstrating how to calculate user segments in Clickhouse.",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dittofeed/clickhouse-segments-tutorial.git"
+  },
+  "keywords": [
+    "Clickhouse",
+    "Segments",
+    "Segmentation",
+    "Tutorial"
+  ],
+  "author": "Max Gurewitz",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dittofeed/clickhouse-segments-tutorial/issues"
+  },
+  "homepage": "https://github.com/dittofeed/clickhouse-segments-tutorial#readme"
+}
