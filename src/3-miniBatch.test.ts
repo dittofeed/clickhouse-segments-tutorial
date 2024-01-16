@@ -5,10 +5,11 @@ const ch = createClient({
   database: "segmentation",
   clickhouse_settings: {
     wait_end_of_query: 1,
+    date_time_input_format: "best_effort",
   },
 });
 
-const setup = [
+const setupTables = [
   `
     CREATE TABLE user_events_mini_batch (
         user_id String,
@@ -27,6 +28,15 @@ const setup = [
     Engine = AggregatingMergeTree()
     ORDER BY (user_id);`,
   `
+    CREATE TABLE updated_user_states_mini_batch (
+        user_id String,
+        computed_at DateTime DEFAULT now()
+    )
+    Engine = MergeTree()
+    PARTITION BY toYYYYMMDD(computed_at)
+    ORDER BY computed_at
+    TTL toStartOfDay(computed_at) + interval 100 day;`,
+  `
     CREATE TABLE segment_assignments_mini_batch (
         user_id String,
         value Boolean,
@@ -35,6 +45,16 @@ const setup = [
     )
     Engine = ReplacingMergeTree()
     ORDER BY (user_id);`,
+] as const;
+
+const setupViews = [
+  `
+    CREATE MATERIALIZED VIEW updated_user_states_mini_batch_mv
+    TO updated_user_states_mini_batch
+    AS SELECT
+      user_id,
+      computed_at
+    FROM user_states_mini_batch;`,
 ] as const;
 
 interface MiniBatchEvent {
@@ -47,7 +67,15 @@ interface MiniBatchEvent {
 describe("using an mini batch setup", () => {
   beforeAll(async () => {
     await Promise.all(
-      setup.map((sql) =>
+      setupTables.map((sql) =>
+        ch.command({
+          query: sql,
+        })
+      )
+    );
+
+    await Promise.all(
+      setupViews.map((sql) =>
         ch.command({
           query: sql,
         })
@@ -56,6 +84,10 @@ describe("using an mini batch setup", () => {
   });
 
   it("calculates segments of users which clicked a button at least 2 times", async () => {
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
     await ch.insert({
       table:
         "user_events_mini_batch (user_id, event_name, timestamp, message_id)",
@@ -63,19 +95,19 @@ describe("using an mini batch setup", () => {
         {
           user_id: "1",
           event_name: "BUTTON_CLICK",
-          timestamp: "2023-01-01 00:00:00",
+          timestamp: twoMinutesAgo.toISOString(),
           message_id: "de4b1e29-7cf8-4e3e-b92b-05c8d5fd1606",
         },
         {
           user_id: "1",
           event_name: "BUTTON_CLICK",
-          timestamp: "2023-01-01 00:05:00",
+          timestamp: oneMinuteAgo.toISOString(),
           message_id: "ca4222e5-4497-42aa-9323-f9ec04a91c87",
         },
         {
           user_id: "2",
           event_name: "BUTTON_CLICK",
-          timestamp: "2023-01-01 00:00:00",
+          timestamp: twoMinutesAgo.toISOString(),
           message_id: "c38f4196-b60b-4f7c-b8e5-b243755c0f77",
         },
       ] satisfies MiniBatchEvent[],
@@ -88,11 +120,17 @@ describe("using an mini batch setup", () => {
         SELECT
           user_id,
           uniqState(message_id),
-          now()
+          parseDateTimeBestEffort({now:String})
         FROM user_events_mini_batch
-        WHERE event_name = 'BUTTON_CLICK'
+        WHERE
+          event_name = 'BUTTON_CLICK'
+          AND timestamp >= parseDateTimeBestEffort({lower_bound:String})
         GROUP BY user_id;
       `,
+      query_params: {
+        lower_bound: twoMinutesAgo.toISOString(),
+        now: now.toISOString(),
+      },
     });
 
     await ch.command({
@@ -101,10 +139,19 @@ describe("using an mini batch setup", () => {
         SELECT
           user_id,
           uniqMerge(event_count) >= 2,
-          now()
+          parseDateTimeBestEffort({now:String})
         FROM user_states_mini_batch
+        WHERE
+          user_id IN (
+            SELECT user_id
+            FROM updated_user_states_mini_batch
+            WHERE computed_at >= parseDateTimeBestEffort({now:String})
+          )
         GROUP BY user_id;
       `,
+      query_params: {
+        now: now.toISOString(),
+      },
     });
 
     const segmentsResponse = await ch.query({
