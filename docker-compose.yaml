@@ -1,0 +1,19 @@
+services:
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:23.8.8.20-alpine
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+      - "9009:9009"
+    volumes:
+      - clickhouse_lib:/var/lib/clickhouse
+      - clickhouse_log:/var/log/clickhouse-server
+    networks:
+      - clickhouse-segments-tutorial
+volumes:
+  clickhouse_lib:
+  clickhouse_log:
+networks:
+  clickhouse-segments-tutorial:
+    driver: bridge
+    name: clickhouse-segments-tutorial
