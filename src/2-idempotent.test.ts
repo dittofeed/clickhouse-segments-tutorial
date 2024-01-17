@@ -22,8 +22,7 @@ const setup = [
     CREATE TABLE segment_assignments_idempotent (
         user_id String,
         value Boolean,
-        assigned_at DateTime DEFAULT now(),
-        INDEX value_idx value TYPE minmax GRANULARITY 4
+        assigned_at DateTime DEFAULT now()
     )
     Engine = ReplacingMergeTree()
     ORDER BY (user_id);`,
