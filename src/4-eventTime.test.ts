@@ -43,8 +43,7 @@ const setupTables = [
         user_id String,
         value Boolean,
         last_event_time DateTime,
-        assigned_at DateTime DEFAULT now(),
-        INDEX value_idx value TYPE minmax GRANULARITY 4
+        assigned_at DateTime DEFAULT now()
     )
     Engine = ReplacingMergeTree()
     ORDER BY (user_id);`,
