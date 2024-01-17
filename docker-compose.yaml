@@ -1,11 +1,4 @@
 services:
-  postgres:
-    image: "postgres:15"
-    restart: always
-    ports:
-      - "5432:5432"
-    networks:
-      - clickhouse-segments-tutorial
   clickhouse-server:
     image: clickhouse/clickhouse-server:23.8.8.20-alpine
     ports:
@@ -18,7 +11,6 @@ services:
     networks:
       - clickhouse-segments-tutorial
 volumes:
-  postgres:
   clickhouse_lib:
   clickhouse_log:
 networks:
