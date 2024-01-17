@@ -11,7 +11,7 @@ const ch = createClient({
 
 const setupTables = [
   `
-    CREATE TABLE user_events_mini_batch (
+    CREATE TABLE user_events_micro_batch (
         user_id String,
         event_name LowCardinality(String),
         message_id String,
@@ -20,7 +20,7 @@ const setupTables = [
     Engine = MergeTree()
     ORDER BY (user_id, event_name, timestamp, message_id);`,
   `
-    CREATE TABLE user_states_mini_batch (
+    CREATE TABLE user_states_micro_batch (
         user_id String,
         event_count AggregateFunction(uniq, String),
         computed_at DateTime DEFAULT now(),
@@ -28,7 +28,7 @@ const setupTables = [
     Engine = AggregatingMergeTree()
     ORDER BY (user_id);`,
   `
-    CREATE TABLE updated_user_states_mini_batch (
+    CREATE TABLE updated_user_states_micro_batch (
         user_id String,
         computed_at DateTime DEFAULT now()
     )
@@ -37,7 +37,7 @@ const setupTables = [
     ORDER BY computed_at
     TTL toStartOfDay(computed_at) + interval 100 day;`,
   `
-    CREATE TABLE segment_assignments_mini_batch (
+    CREATE TABLE segment_assignments_micro_batch (
         user_id String,
         value Boolean,
         assigned_at DateTime DEFAULT now()
@@ -48,22 +48,22 @@ const setupTables = [
 
 const setupViews = [
   `
-    CREATE MATERIALIZED VIEW updated_user_states_mini_batch_mv
-    TO updated_user_states_mini_batch
+    CREATE MATERIALIZED VIEW updated_user_states_micro_batch_mv
+    TO updated_user_states_micro_batch
     AS SELECT
       user_id,
       computed_at
-    FROM user_states_mini_batch;`,
+    FROM user_states_micro_batch;`,
 ] as const;
 
-interface MiniBatchEvent {
+interface microBatchEvent {
   user_id: string;
   event_name: string;
   timestamp: string;
   message_id: string;
 }
 
-describe("using an mini batch setup", () => {
+describe("using an micro batch setup", () => {
   beforeAll(async () => {
     await Promise.all(
       setupTables.map((sql) =>
@@ -89,7 +89,7 @@ describe("using an mini batch setup", () => {
 
     await ch.insert({
       table:
-        "user_events_mini_batch (user_id, event_name, timestamp, message_id)",
+        "user_events_micro_batch (user_id, event_name, timestamp, message_id)",
       values: [
         {
           user_id: "1",
@@ -109,18 +109,18 @@ describe("using an mini batch setup", () => {
           timestamp: twoMinutesAgo.toISOString(),
           message_id: "c38f4196-b60b-4f7c-b8e5-b243755c0f77",
         },
-      ] satisfies MiniBatchEvent[],
+      ] satisfies microBatchEvent[],
       format: "JSONEachRow",
     });
 
     await ch.command({
       query: `
-        INSERT INTO user_states_mini_batch
+        INSERT INTO user_states_micro_batch
         SELECT
           user_id,
           uniqState(message_id),
           parseDateTimeBestEffort({now:String})
-        FROM user_events_mini_batch
+        FROM user_events_micro_batch
         WHERE
           event_name = 'BUTTON_CLICK'
           AND timestamp >= parseDateTimeBestEffort({lower_bound:String})
@@ -134,16 +134,16 @@ describe("using an mini batch setup", () => {
 
     await ch.command({
       query: `
-        INSERT INTO segment_assignments_mini_batch
+        INSERT INTO segment_assignments_micro_batch
         SELECT
           user_id,
           uniqMerge(event_count) >= 2,
           parseDateTimeBestEffort({now:String})
-        FROM user_states_mini_batch
+        FROM user_states_micro_batch
         WHERE
           user_id IN (
             SELECT user_id
-            FROM updated_user_states_mini_batch
+            FROM updated_user_states_micro_batch
             WHERE computed_at >= parseDateTimeBestEffort({now:String})
           )
         GROUP BY user_id;
@@ -158,7 +158,7 @@ describe("using an mini batch setup", () => {
           SELECT
             user_id,
             argMax(value, assigned_at) AS latest_value
-          FROM segment_assignments_mini_batch
+          FROM segment_assignments_micro_batch
           GROUP BY user_id
           HAVING latest_value = True;
       `,

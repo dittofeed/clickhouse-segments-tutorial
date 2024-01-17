@@ -21,7 +21,8 @@ const setup = [
     CREATE TABLE segment_assignments_naive (
         user_id String,
         value Boolean,
-        assigned_at DateTime DEFAULT now()
+        assigned_at DateTime DEFAULT now(),
+        INDEX value_idx value TYPE minmax GRANULARITY 4
     )
     Engine = ReplacingMergeTree()
     ORDER BY (user_id);`,
@@ -83,8 +84,8 @@ describe("using a naive setup", () => {
             user_id,
             argMax(value, assigned_at) AS latest_value
           FROM segment_assignments_naive
-          GROUP BY user_id
-          HAVING latest_value = True;
+          WHERE value = True
+          GROUP BY user_id;
       `,
     });
     const { data: usersInSegment } = (await segmentsResponse.json()) as {
