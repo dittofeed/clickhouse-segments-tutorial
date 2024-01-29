@@ -10,3 +10,7 @@ These test implementations are written in ascending order of complexity.
 2. [Idempotent](./src/2-idempotent.test.ts)
 3. [Micro-Batch](./src/3-microBatch.test.ts)
 4. [Event Time vs. Processing Time](./src/4-eventTime.test.ts)
+
+If you found this interesting, we'd love it if you shot over to our main repo and gave us a star! 🌟
+
+https://github.com/dittofeed/dittofeed
